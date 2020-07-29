@@ -1,3 +1,20 @@
+"""
+Baseline CIFAR-10 training script. 
+
+Simply running "CUDA_VISIBLE_DEVICES=X python3 baseline.py" should get you the following results for the first few epochs:
+
+(base) sauravkadavath@shadowfax:~/nnets-playground/cifar:[master !?]$ CUDA_VISIBLE_DEVICES=0 python3 baseline.py
+{'batch_size': 128, 'dataset': 'cifar10', 'decay': 0.0005, 'droprate': 0.0, 'epochs': 100, 'layers': 40, 'learning_rate': 0.1, 'load': '', 'model': 'wrn', 'momentum': 0.9, 'ngpu': 1, 'prefetch': 4, 'save': './snapshots/rot_five', 'test': False, 'test_bs': 200, 'widen_factor': 2}
+Beginning Training
+
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 391/391 [00:20<00:00, 19.36it/s]
+Epoch   1 | Time    22 | Train Loss 1.0872 | Test Loss 1.371 | Test Error 46.04
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 391/391 [00:19<00:00, 20.58it/s]
+Epoch   2 | Time    20 | Train Loss 0.7776 | Test Loss 1.045 | Test Error 35.85
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 391/391 [00:18<00:00, 21.26it/s]
+Epoch   3 | Time    20 | Train Loss 0.6481 | Test Loss 1.138 | Test Error 35.28
+"""
+
 # -*- coding: utf-8 -*-
 import numpy as np
 import os
@@ -30,11 +47,11 @@ parser.add_argument('--layers', default=40, type=int, help='total number of laye
 parser.add_argument('--widen-factor', default=2, type=int, help='widen factor')
 parser.add_argument('--droprate', default=0.0, type=float, help='dropout probability')
 # Checkpoints
-parser.add_argument('--save', '-s', type=str, default='./snapshots/rot_five', help='Folder to save checkpoints.')
+parser.add_argument('--save', '-s', type=str, default='./snapshots/TEMP', help='Folder to save checkpoints.')
 parser.add_argument('--load', '-l', type=str, default='', help='Checkpoint path to resume / test.')
 parser.add_argument('--test', '-t', action='store_true', help='Test only flag.')
 # Acceleration
-parser.add_argument('--ngpu', type=int, default=2, help='0 = CPU.')
+parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
 parser.add_argument('--prefetch', type=int, default=4, help='Pre-fetching threads.')
 args = parser.parse_args()
 
@@ -52,12 +69,12 @@ train_transform = trn.Compose([trn.RandomHorizontalFlip(), trn.RandomCrop(32, pa
 test_transform = trn.Compose([trn.ToTensor()])
 
 if args.dataset == 'cifar10':
-    train_data = dset.CIFAR10('~/datasets/cifarpy', train=True, transform=train_transform)
-    test_data = dset.CIFAR10('~/datasets/cifarpy', train=False, transform=test_transform)
+    train_data = dset.CIFAR10('/data/sauravkadavath/cifar10-dataset/', train=True, transform=train_transform)
+    test_data = dset.CIFAR10('/data/sauravkadavath/cifar10-dataset/', train=False, transform=test_transform)
     num_classes = 10
 else:
-    train_data = dset.CIFAR100('~/datasets/cifarpy', train=True, transform=train_transform)
-    test_data = dset.CIFAR100('~/datasets/cifarpy', train=False, transform=test_transform)
+    train_data = dset.CIFAR100('/data/sauravkadavath/cifar10-dataset/', train=True, transform=train_transform)
+    test_data = dset.CIFAR100('/data/sauravkadavath/cifar10-dataset/', train=False, transform=test_transform)
     num_classes = 100
 
 
@@ -110,19 +127,19 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(
 def train():
     net.train()  # enter train mode
     loss_avg = 0.0
-    for bx, by in train_loader:
+    for bx, by in tqdm(train_loader):
         curr_batch_size = bx.size(0)
         bx, by = bx.cuda(), by.cuda()
 
         # forward
-        logits, pen = net(adv_bx * 2 - 1)
+        logits = net(bx * 2 - 1)
 
         # backward
-        scheduler.step()
         optimizer.zero_grad()
         loss = F.cross_entropy(logits, by)
         loss.backward()
         optimizer.step()
+        scheduler.step()
 
         # exponential moving average
         loss_avg = loss_avg * 0.9 + float(loss) * 0.1
@@ -139,7 +156,7 @@ def test():
             data, target = data.cuda(), target.cuda()
 
             # forward
-            output, _ = net(data * 2 - 1)
+            output = net(data * 2 - 1)
             loss = F.cross_entropy(output, target)
 
             # accuracy
