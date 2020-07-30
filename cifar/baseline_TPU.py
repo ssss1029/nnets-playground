@@ -93,11 +93,7 @@ test_loader = torch.utils.data.DataLoader(
     num_workers=args.prefetch, pin_memory=True)
 
 # XLA devices
-devices = (
-    xm.get_xla_supported_devices(
-        max_devices=args.num_cores
-    ) if args.num_cores != 0 else []
-)
+devices = xm.get_xla_supported_devices()
 print("XLA Devices = {0}".format(devices))
 xla_device = devices[0]
 print("Using XLA device = {0}".format(xla_device))
