@@ -241,6 +241,6 @@ for epoch in range(start_epoch, args.epochs):
         100 - 100. * state['test_accuracy'])
     )
 
-    writer.add_scalar("train_loss", state["train_loss"])
-    writer.add_scalar("test_loss", state["test_loss"])
-    writer.add_scalar("test_accuracy", state["test_accuracy"])
+    writer.add_scalar("train_loss", state["train_loss"], epoch + 1)
+    writer.add_scalar("test_loss", state["test_loss"], epoch + 1)
+    writer.add_scalar("test_accuracy", state["test_accuracy"], epoch + 1)
