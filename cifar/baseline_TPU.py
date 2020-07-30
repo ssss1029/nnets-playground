@@ -37,6 +37,8 @@ import torch_xla.utils.utils as xu
 import torch_xla.core.xla_model as xm
 import torch_xla.test.test_utils as xtest_utils
 
+from torch.utils.tensorboard import SummaryWriter
+
 parser = argparse.ArgumentParser(description='Trains a CIFAR Classifier',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10', 'cifar100'],
@@ -67,6 +69,8 @@ print(state)
 
 torch.manual_seed(1)
 np.random.seed(1)
+
+writer = SummaryWriter(os.path.join(args.save, "tensorboard_dir"))
 
 # # mean and standard deviation of channels of CIFAR-10 images
 # mean = [x / 255 for x in [125.3, 123.0, 113.9]]
@@ -128,6 +132,8 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(
         1,  # since lr_lambda computes multiplicative factor
         1e-6 / args.learning_rate))
 
+
+writer.add_graph(net)
 
 # /////////////// Training ///////////////
 
