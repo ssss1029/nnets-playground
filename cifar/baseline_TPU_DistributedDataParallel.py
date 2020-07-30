@@ -33,14 +33,14 @@ from tqdm import tqdm
 from models.wrn import WideResNet
 
 import torch_xla
-import torch_xla.debug.metrics as xmet
+import torch_xla.debug.metrics as xmetrics
 
 import torch_xla.distributed.data_parallel as xdp
 import torch_xla.core.xla_model as xm
 import torch_xla.distributed.parallel_loader as pl
 import torch_xla.distributed.xla_multiprocessing as xmp
 
-import torch_xla.utils.utils as xu
+import torch_xla.utils.utils as xutils
 import torch_xla.test.test_utils as xtest_utils
 
 from torch.utils.tensorboard import SummaryWriter
@@ -102,98 +102,6 @@ test_loader = torch.utils.data.DataLoader(
     test_data, batch_size=args.test_bs, shuffle=False,
     num_workers=args.prefetch, pin_memory=True)
 
-# XLA devices
-devices = xm.get_xla_supported_devices()
-print("XLA Devices = {0}".format(devices))
-xla_device = devices[0]
-print("Using XLA device = {0}".format(xla_device))
-
-
-# Create model
-if args.model == 'wrn':
-    net = WideResNet(args.layers, num_classes, args.widen_factor, dropRate=args.droprate)
-else:
-    raise NotImplementedError()
-
-# XLA
-net = net.train().to(xla_device)
-
-start_epoch = 0
-
-optimizer = torch.optim.SGD(
-    net.parameters(), state['learning_rate'], momentum=state['momentum'],
-    weight_decay=state['decay'], nesterov=True)
-
-
-def cosine_annealing(step, total_steps, lr_max, lr_min):
-    return lr_min + (lr_max - lr_min) * 0.5 * (
-            1 + np.cos(step / total_steps * np.pi))
-
-
-scheduler = torch.optim.lr_scheduler.LambdaLR(
-    optimizer,
-    lr_lambda=lambda step: cosine_annealing(
-        step,
-        args.epochs * len(train_loader),
-        1,  # since lr_lambda computes multiplicative factor
-        1e-6 / args.learning_rate))
-
-
-writer.add_graph(net, train_data[0][0].unsqueeze(0).to(xla_device))
-# /////////////// Training ///////////////
-
-
-def train():
-    net.train()  # enter train mode
-    loss_avg = 0.0
-    for bx, by in tqdm(train_loader):
-        bx, by = bx.to(xla_device), by.to(xla_device)
-        curr_batch_size = bx.size(0)
-
-        # forward
-        logits = net(bx * 2 - 1)
-
-        # backward
-        optimizer.zero_grad()
-        loss = F.cross_entropy(logits, by)
-        loss.backward()
-        xm.optimizer_step(optimizer, barrier=True)
-
-        scheduler.step()
-
-        # exponential moving average
-        loss_avg = loss_avg * 0.9 + float(loss) * 0.1
-
-    state['train_loss'] = loss_avg
-
-# test function
-def test():
-    net.eval()
-    loss_avg = 0.0
-    correct = 0
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(xla_device), target.to(xla_device)
-
-            # forward
-            output = net(data * 2 - 1)
-            loss = F.cross_entropy(output, target)
-
-            # accuracy
-            pred = output.data.max(1)[1]
-            correct += pred.eq(target.data).sum().item()
-
-            # test loss average
-            loss_avg += float(loss.data)
-
-    state['test_loss'] = loss_avg / len(test_loader)
-    state['test_accuracy'] = correct / len(test_loader.dataset)
-
-
-if args.test:
-    test()
-    print(state)
-    exit()
 
 # Make save directory
 if not os.path.exists(args.save):
@@ -205,49 +113,121 @@ with open(os.path.join(args.save, args.dataset + args.model +
                                   '_baseline_training_results.csv'), 'w') as f:
     f.write('epoch,time(s),train_loss,test_loss,test_error(%)\n')
 
-print('Beginning Training\n')
 
-# Main loop
-for epoch in range(start_epoch, args.epochs):
-    state['epoch'] = epoch
+# /////////////// Training ///////////////
 
-    begin_epoch = time.time()
 
-    train()
-    test()
+def train(index):
+    """
+    index: TPU index
+    """
+    device = xm.xla_device()
+    parallel_loader = pl.ParallelLoader(train_loader, [device])
 
-    # Save model
-    torch.save(net.state_dict(),
-               os.path.join(args.save, args.dataset + args.model +
-                            '_baseline_epoch_' + str(epoch) + '.pt'))
-    # Let us not waste space and delete the previous model
-    prev_path = os.path.join(args.save, args.dataset + args.model +
-                             '_baseline_epoch_' + str(epoch - 1) + '.pt')
-    if os.path.exists(prev_path): os.remove(prev_path)
 
-    # Show results
+    net = net.train().to(device) # enter train mode
 
-    with open(os.path.join(args.save, args.dataset + args.model +
-                                      '_baseline_training_results.csv'), 'a') as f:
-        f.write('%03d,%05d,%0.6f,%0.5f,%0.2f\n' % (
+    optimizer = torch.optim.SGD(
+        net.parameters(), state['learning_rate'], momentum=state['momentum'],
+        weight_decay=state['decay'], nesterov=True)
+
+
+    def cosine_annealing(step, total_steps, lr_max, lr_min):
+        return lr_min + (lr_max - lr_min) * 0.5 * (
+                1 + np.cos(step / total_steps * np.pi))
+
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer,
+        lr_lambda=lambda step: cosine_annealing(
+            step,
+            args.epochs * len(train_loader),
+            1,  # since lr_lambda computes multiplicative factor
+            1e-6 / args.learning_rate))
+
+    loss_avg = 0.0
+    for bx, by in parallel_loader.per_device_loader(device):
+        curr_batch_size = bx.size(0)
+
+        optimizer.zero_grad()
+
+        # forward
+        logits = net(bx * 2 - 1)
+        loss = F.cross_entropy(logits, by)
+        # backward
+        loss.backward()
+        xm.optimizer_step(optimizer)
+
+        scheduler.step()
+
+        # exponential moving average
+        loss_avg = loss_avg * 0.9 + float(loss) * 0.1
+
+    # state['train_loss'] = loss_avg
+    return loss_avg
+
+
+def main():
+    # Create model
+    if args.model == 'wrn':
+        net = WideResNet(args.layers, num_classes, args.widen_factor, dropRate=args.droprate).train()
+    else:
+        raise NotImplementedError()
+
+    start_epoch = 0
+
+    print('Beginning Training\n')
+
+    # Main loop
+    for epoch in range(start_epoch, args.epochs):
+        state['epoch'] = epoch
+
+        begin_epoch = time.time()
+
+        # Spawn a bunch of processes, one for each TPU core.
+        res = xmp.spawn(train, args=(args), nprocs=8)
+        print(res)
+        
+        # test()
+
+        # Save model
+        torch.save(
+            net.state_dict(),
+            os.path.join(
+                args.save, 
+                args.dataset + args.model + '_baseline_epoch_' + str(epoch) + '.pt'
+            )
+        )
+
+        # Let us not waste space and delete the previous model
+        prev_path = os.path.join(
+            args.save, args.dataset + args.model +
+            '_baseline_epoch_' + str(epoch - 1) + '.pt'
+        )
+        if os.path.exists(prev_path): os.remove(prev_path)
+
+        # Show results
+        with open(os.path.join(args.save, args.dataset + args.model +
+                                        '_baseline_training_results.csv'), 'a') as f:
+            f.write('%03d,%05d,%0.6f,%0.5f,%0.2f\n' % (
+                (epoch + 1),
+                time.time() - begin_epoch,
+                state['train_loss'],
+                state['test_loss'],
+                100 - 100. * state['test_accuracy'],
+            ))
+
+        print('Epoch {0:3d} | Time {1:5d} | Train Loss {2:.4f} | Test Loss {3:.3f} | Test Error {4:.2f}'.format(
             (epoch + 1),
-            time.time() - begin_epoch,
+            int(time.time() - begin_epoch),
             state['train_loss'],
             state['test_loss'],
-            100 - 100. * state['test_accuracy'],
-        ))
+            100 - 100. * state['test_accuracy'])
+        )
 
-    # # print state with rounded decimals
-    # print({k: round(v, 4) if isinstance(v, float) else v for k, v in state.items()})
+        writer.add_scalar("test_loss", state["test_loss"], epoch + 1)
+        writer.add_scalar("test_accuracy", state["test_accuracy"], epoch + 1)
 
-    print('Epoch {0:3d} | Time {1:5d} | Train Loss {2:.4f} | Test Loss {3:.3f} | Test Error {4:.2f}'.format(
-        (epoch + 1),
-        int(time.time() - begin_epoch),
-        state['train_loss'],
-        state['test_loss'],
-        100 - 100. * state['test_accuracy'])
-    )
 
-    writer.add_scalar("train_loss", state["train_loss"], epoch + 1)
-    writer.add_scalar("test_loss", state["test_loss"], epoch + 1)
-    writer.add_scalar("test_accuracy", state["test_accuracy"], epoch + 1)
+if __name__ == "__main__":
+    main()
