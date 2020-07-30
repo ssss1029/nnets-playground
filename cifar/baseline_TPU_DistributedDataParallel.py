@@ -167,7 +167,7 @@ def main():
         batch_size=args.test_bs,
         num_workers=args.prefetch, 
         drop_last=True, 
-        sampler=test_sample
+        sampler=test_sampler
     )
 
     # Create model
