@@ -112,15 +112,6 @@ net = xdp.DataParallel(net, device_ids=devices)
 
 start_epoch = 0
 
-if args.ngpu > 1:
-    net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
-
-if args.ngpu > 0:
-    net.cuda()
-    torch.cuda.manual_seed(1)
-
-cudnn.benchmark = True  # fire on all cylinders
-
 optimizer = torch.optim.SGD(
     net.parameters(), state['learning_rate'], momentum=state['momentum'],
     weight_decay=state['decay'], nesterov=True)
@@ -148,7 +139,6 @@ def train():
     loss_avg = 0.0
     for bx, by in tqdm(train_loader):
         curr_batch_size = bx.size(0)
-        bx, by = bx.cuda(), by.cuda()
 
         # forward
         logits = net(bx * 2 - 1)
@@ -172,7 +162,6 @@ def test():
     correct = 0
     with torch.no_grad():
         for data, target in test_loader:
-            data, target = data.cuda(), target.cuda()
 
             # forward
             output = net(data * 2 - 1)
