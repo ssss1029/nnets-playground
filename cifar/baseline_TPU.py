@@ -133,7 +133,7 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(
         1e-6 / args.learning_rate))
 
 
-writer.add_graph(net, train_loader[0][0])
+writer.add_graph(net, train_data[0][0])
 
 # /////////////// Training ///////////////
 
