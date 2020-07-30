@@ -1,6 +1,8 @@
+
+
 """
 Baseline XLA CIFAR-10 training script. 
-Uses ONE TPU device.
+Can use multiple TPU Devices.
 
 Simply running "CUDA_VISIBLE_DEVICES=X python3 baseline.py" should get you the following results for the first few epochs:
 
@@ -31,10 +33,14 @@ from tqdm import tqdm
 from models.wrn import WideResNet
 
 import torch_xla
-import torch_xla.debug.metrics as xmetrics
+import torch_xla.debug.metrics as xmet
+
 import torch_xla.distributed.data_parallel as xdp
-import torch_xla.utils.utils as xu
 import torch_xla.core.xla_model as xm
+import torch_xla.distributed.parallel_loader as pl
+import torch_xla.distributed.xla_multiprocessing as xmp
+
+import torch_xla.utils.utils as xu
 import torch_xla.test.test_utils as xtest_utils
 
 from torch.utils.tensorboard import SummaryWriter
@@ -141,7 +147,6 @@ def train():
     net.train()  # enter train mode
     loss_avg = 0.0
     for bx, by in tqdm(train_loader):
-        print(xmetrics.metrics_report())
         bx, by = bx.to(xla_device), by.to(xla_device)
         curr_batch_size = bx.size(0)
 
