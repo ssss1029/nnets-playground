@@ -64,6 +64,7 @@ parser.add_argument('--load', '-l', type=str, default='', help='Checkpoint path 
 parser.add_argument('--test', '-t', action='store_true', help='Test only flag.')
 # Acceleration
 parser.add_argument('--prefetch', type=int, default=4, help='Pre-fetching threads.')
+parser.add_argument('--nprocs', type=int, default=1, help='Number of TPUs to distribute over')
 args = parser.parse_args()
 
 state = {k: v for k, v in args._get_kwargs()}
@@ -252,4 +253,4 @@ def main(index, args):
 
 
 if __name__ == "__main__":
-    xmp.spawn(main, args=(args,), nprocs=1)
+    xmp.spawn(main, args=(args,), nprocs=args.nprocs)
