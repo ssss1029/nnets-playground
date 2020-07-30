@@ -94,7 +94,7 @@ with open(os.path.join(args.save, args.dataset + args.model +
 # /////////////// Training ///////////////
 
 
-def train(train_loader, args, xla_device):
+def train(train_loader, xla_device, args):
 
     device = xm.xla_device()
     parallel_loader = pl.ParallelLoader(train_loader, [xla_device]).per_device_loader(xla_device)
