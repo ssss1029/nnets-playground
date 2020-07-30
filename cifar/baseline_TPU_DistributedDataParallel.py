@@ -246,8 +246,8 @@ def main(index, args):
         all_test_results = parse_test_results(all_test_results)
 
         if xm.is_master_ordinal():
-            child_train_losses = [float(L) for L in all_train_losses]
-            train_loss = sum(child_train_losses) / float(len(train_losses))
+            all_train_losses = [float(L) for L in all_train_losses]
+            train_loss = sum(all_train_losses) / float(len(all_train_losses))
             state['train_loss'] = train_loss
 
             test_loss = sum([r[0] for r in all_test_results]) / sum([r[2] for r in all_test_results])
