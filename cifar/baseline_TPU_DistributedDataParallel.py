@@ -242,6 +242,7 @@ def main(index, args):
         # TODO: Make this work.
         all_train_losses = xm.rendezvous("calc_train_loss", payload=str(train_loss))
         all_test_results = xm.rendezvous("calc_test_results", payload=str(test_results))
+        print(all_test_results)
         all_test_results = parse_test_results(all_test_results)
 
         if xm.is_master_ordinal():
