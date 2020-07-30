@@ -58,7 +58,7 @@ parser.add_argument('--save', '-s', type=str, default='./snapshots/TEMP', help='
 parser.add_argument('--load', '-l', type=str, default='', help='Checkpoint path to resume / test.')
 parser.add_argument('--test', '-t', action='store_true', help='Test only flag.')
 # Acceleration
-parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
+parser.add_argument('--num-cores', type=int, default=1, help='0 = CPU.')
 parser.add_argument('--prefetch', type=int, default=4, help='Pre-fetching threads.')
 args = parser.parse_args()
 
@@ -95,7 +95,7 @@ test_loader = torch.utils.data.DataLoader(
 # XLA devices
 devices = (
     xm.get_xla_supported_devices(
-        max_devices=FLAGS.num_cores
+        max_devices=args.num_cores
     ) if FLAGS.num_cores != 0 else []
 )
 print("XLA Devices = {0}".format(devices))
