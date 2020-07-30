@@ -156,11 +156,19 @@ def main():
     )
 
     train_loader = torch.utils.data.DataLoader(
-        train_data, batch_size=args.batch_size, shuffle=True,
-        num_workers=args.prefetch, pin_memory=True, sampler=train_sampler)
+        train_data, 
+        batch_size=args.batch_size,
+        num_workers=args.prefetch, 
+        drop_last=True, 
+        sampler=train_sampler
+    )
     test_loader = torch.utils.data.DataLoader(
-        test_data, batch_size=args.test_bs, shuffle=False,
-        num_workers=args.prefetch, pin_memory=True, sampler=test_sample)
+        test_data, 
+        batch_size=args.test_bs,
+        num_workers=args.prefetch, 
+        drop_last=True, 
+        sampler=test_sample
+    )
 
     # Create model
     if args.model == 'wrn':
