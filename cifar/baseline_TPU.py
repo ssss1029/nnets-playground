@@ -152,8 +152,8 @@ def train():
         loss = F.cross_entropy(logits, by)
         loss.backward()
         xm.optimizer_step(optimizer, barrier=True)
-        print(torch_xla._XLAC._xla_tensors_report(0, str(device)))
-        
+        print(torch_xla._XLAC._xla_tensors_report(0, str(xla_device)))
+
         scheduler.step()
 
         # exponential moving average
