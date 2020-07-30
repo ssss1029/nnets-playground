@@ -116,7 +116,7 @@ with open(os.path.join(args.save, args.dataset + args.model +
 # /////////////// Training ///////////////
 
 
-def train(index):
+def train(index, args):
     """
     index: TPU index
     """
@@ -127,8 +127,12 @@ def train(index):
     net = net.train().to(device) # enter train mode
 
     optimizer = torch.optim.SGD(
-        net.parameters(), state['learning_rate'], momentum=state['momentum'],
-        weight_decay=state['decay'], nesterov=True)
+        net.parameters(), 
+        args.learning_rate, 
+        momentum=args.momentum,
+        weight_decay=args.decay, 
+        nesterov=True
+    )
 
 
     def cosine_annealing(step, total_steps, lr_max, lr_min):
