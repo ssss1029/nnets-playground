@@ -299,6 +299,7 @@ def main(index, args):
 def parse_test_results(results):
     parsed = []
     for result in results:
+        result = str(result)
         result = result.split(',')
         result[0] = result[0][1:]
         result[-1] = result[-1][:-1]
