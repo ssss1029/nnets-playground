@@ -125,7 +125,7 @@ def train(train_loader, net, optimizer, scheduler, xla_device, args):
     return loss_avg
 
 
-def main():
+def main(index, args):
     if xm.is_master_ordinal():
         print(state)
 
@@ -207,7 +207,7 @@ def main():
         begin_epoch = time.time()
 
         # Spawn a bunch of processes, one for each TPU core.
-        train(train_loader, net, optimizer, scheduler, xla_device, args)
+        res = train(train_loader, net, optimizer, scheduler, xla_device, args)
         print(res)
 
         # test()
@@ -252,4 +252,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    xmp.spawn(main, args=(args,), nprocs=8)
