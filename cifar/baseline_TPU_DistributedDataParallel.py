@@ -71,7 +71,6 @@ parser.add_argument('--prefetch', type=int, default=4, help='Pre-fetching thread
 args = parser.parse_args()
 
 state = {k: v for k, v in args._get_kwargs()}
-print(state)
 
 torch.manual_seed(1)
 np.random.seed(1)
@@ -168,6 +167,9 @@ def train(index):
 
 
 def main():
+
+    print(state)
+
     # Create model
     if args.model == 'wrn':
         net = WideResNet(args.layers, num_classes, args.widen_factor, dropRate=args.droprate).train()
@@ -185,9 +187,9 @@ def main():
         begin_epoch = time.time()
 
         # Spawn a bunch of processes, one for each TPU core.
-        res = xmp.spawn(train, args=(args), nprocs=8)
+        res = xmp.spawn(train, args=(args,), nprocs=8)
         print(res)
-        
+
         # test()
 
         # Save model
