@@ -80,24 +80,6 @@ writer = SummaryWriter(os.path.join(args.save, "tensorboard_dir"))
 train_transform = trn.Compose([trn.RandomHorizontalFlip(), trn.RandomCrop(32, padding=4), trn.ToTensor()])
 test_transform = trn.Compose([trn.ToTensor()])
 
-if args.dataset == 'cifar10':
-    train_data = dset.CIFAR10('~/cifarpy/', train=True, download=True, transform=train_transform)
-    test_data = dset.CIFAR10('~/cifarpy/', train=False, download=True, transform=test_transform)
-    num_classes = 10
-else:
-    train_data = dset.CIFAR100('~/cifarpy/', train=True, download=True, transform=train_transform)
-    test_data = dset.CIFAR100('~/cifarpy/', train=False, download=True, transform=test_transform)
-    num_classes = 100
-
-
-train_loader = torch.utils.data.DataLoader(
-    train_data, batch_size=args.batch_size, shuffle=True,
-    num_workers=args.prefetch, pin_memory=True)
-test_loader = torch.utils.data.DataLoader(
-    test_data, batch_size=args.test_bs, shuffle=False,
-    num_workers=args.prefetch, pin_memory=True)
-
-
 # Make save directory
 if not os.path.exists(args.save):
     os.makedirs(args.save)
@@ -112,16 +94,17 @@ with open(os.path.join(args.save, args.dataset + args.model +
 # /////////////// Training ///////////////
 
 
-def train(args):
+def train(train_loader, args, xla_device):
 
     device = xm.xla_device()
-    parallel_loader = pl.ParallelLoader(train_loader, [device])
+    parallel_loader = pl.ParallelLoader(train_loader, [xla_device]).per_device_loader(xla_device)
 
 
     net = net.train().to(device) # enter train mode
 
     loss_avg = 0.0
-    for bx, by in parallel_loader.per_device_loader(device):
+    for i, (bx, by) in enumerate(parallel_loader):
+        print("Doing minibatch", i)
         curr_batch_size = bx.size(0)
 
         optimizer.zero_grad()
@@ -143,12 +126,45 @@ def train(args):
 
 
 def main():
+    if xm.is_master_ordinal():
+        print(state)
 
-    print(state)
+    # Acquires the (unique) Cloud TPU core corresponding to this process's index
+    xla_device = xm.xla_device()  
+
+    if args.dataset == 'cifar10':
+        train_data = dset.CIFAR10('~/cifarpy/', train=True, download=True, transform=train_transform)
+        test_data = dset.CIFAR10('~/cifarpy/', train=False, download=True, transform=test_transform)
+        num_classes = 10
+    else:
+        train_data = dset.CIFAR100('~/cifarpy/', train=True, download=True, transform=train_transform)
+        test_data = dset.CIFAR100('~/cifarpy/', train=False, download=True, transform=test_transform)
+        num_classes = 100
+    
+    train_sampler = torch.utils.data.distributed.DistributedSampler(
+        train_data,
+        num_replicas=xm.xrt_world_size(),
+        rank=xm.get_ordinal(),
+        shuffle=True
+    )
+    
+    test_sampler = torch.utils.data.distributed.DistributedSampler(
+        test_data,
+        num_replicas=xm.xrt_world_size(),
+        rank=xm.get_ordinal(),
+        shuffle=False
+    )
+
+    train_loader = torch.utils.data.DataLoader(
+        train_data, batch_size=args.batch_size, shuffle=True,
+        num_workers=args.prefetch, pin_memory=True, sampler=train_sampler)
+    test_loader = torch.utils.data.DataLoader(
+        test_data, batch_size=args.test_bs, shuffle=False,
+        num_workers=args.prefetch, pin_memory=True, sampler=test_sample)
 
     # Create model
     if args.model == 'wrn':
-        net = WideResNet(args.layers, num_classes, args.widen_factor, dropRate=args.droprate).train()
+        net = WideResNet(args.layers, num_classes, args.widen_factor, dropRate=args.droprate).train().to(xla_device)
     else:
         raise NotImplementedError()
 
@@ -183,7 +199,7 @@ def main():
         begin_epoch = time.time()
 
         # Spawn a bunch of processes, one for each TPU core.
-        res = xmp.spawn(train, args=(args,), nprocs=8)
+        train(train_loader, xla_device, args)
         print(res)
 
         # test()
