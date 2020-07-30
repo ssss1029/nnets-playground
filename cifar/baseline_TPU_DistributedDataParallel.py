@@ -34,14 +34,10 @@ from models.wrn import WideResNet
 
 import torch_xla
 import torch_xla.debug.metrics as xmetrics
-
 import torch_xla.distributed.data_parallel as xdp
 import torch_xla.core.xla_model as xm
 import torch_xla.distributed.parallel_loader as pl
 import torch_xla.distributed.xla_multiprocessing as xmp
-
-import torch_xla.utils.utils as xutils
-import torch_xla.test.test_utils as xtest_utils
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -116,37 +112,13 @@ with open(os.path.join(args.save, args.dataset + args.model +
 # /////////////// Training ///////////////
 
 
-def train(index, args):
-    """
-    index: TPU index
-    """
+def train(args):
+
     device = xm.xla_device()
     parallel_loader = pl.ParallelLoader(train_loader, [device])
 
 
     net = net.train().to(device) # enter train mode
-
-    optimizer = torch.optim.SGD(
-        net.parameters(), 
-        args.learning_rate, 
-        momentum=args.momentum,
-        weight_decay=args.decay, 
-        nesterov=True
-    )
-
-
-    def cosine_annealing(step, total_steps, lr_max, lr_min):
-        return lr_min + (lr_max - lr_min) * 0.5 * (
-                1 + np.cos(step / total_steps * np.pi))
-
-
-    scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer,
-        lr_lambda=lambda step: cosine_annealing(
-            step,
-            args.epochs * len(train_loader),
-            1,  # since lr_lambda computes multiplicative factor
-            1e-6 / args.learning_rate))
 
     loss_avg = 0.0
     for bx, by in parallel_loader.per_device_loader(device):
@@ -181,6 +153,26 @@ def main():
         raise NotImplementedError()
 
     start_epoch = 0
+
+    optimizer = torch.optim.SGD(
+        net.parameters(), 
+        args.learning_rate, 
+        momentum=args.momentum,
+        weight_decay=args.decay, 
+        nesterov=True
+    )
+
+    def cosine_annealing(step, total_steps, lr_max, lr_min):
+        return lr_min + (lr_max - lr_min) * 0.5 * (
+                1 + np.cos(step / total_steps * np.pi))
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer,
+        lr_lambda=lambda step: cosine_annealing(
+            step,
+            args.epochs * len(train_loader),
+            1,  # since lr_lambda computes multiplicative factor
+            1e-6 / args.learning_rate))
 
     print('Beginning Training\n')
 
