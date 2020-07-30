@@ -1,5 +1,6 @@
 """
 Baseline XLA CIFAR-10 training script. 
+Uses ONE TPU device.
 
 Simply running "CUDA_VISIBLE_DEVICES=X python3 baseline.py" should get you the following results for the first few epochs:
 
@@ -58,7 +59,6 @@ parser.add_argument('--save', '-s', type=str, default='./snapshots/TEMP', help='
 parser.add_argument('--load', '-l', type=str, default='', help='Checkpoint path to resume / test.')
 parser.add_argument('--test', '-t', action='store_true', help='Test only flag.')
 # Acceleration
-parser.add_argument('--num-cores', type=int, default=1, help='0 = CPU.')
 parser.add_argument('--prefetch', type=int, default=4, help='Pre-fetching threads.')
 args = parser.parse_args()
 
@@ -99,6 +99,8 @@ devices = (
     ) if args.num_cores != 0 else []
 )
 print("XLA Devices = {0}".format(devices))
+xla_device = devices[0]
+print("Using XLA device = {0}".format(xla_device))
 
 
 # Create model
@@ -107,8 +109,8 @@ if args.model == 'wrn':
 else:
     raise NotImplementedError()
 
-# XLA DataParallel
-net = xdp.DataParallel(net, device_ids=devices)
+# XLA
+net = net.train().to(xla_device)
 
 start_epoch = 0
 
@@ -138,6 +140,7 @@ def train():
     net.train()  # enter train mode
     loss_avg = 0.0
     for bx, by in tqdm(train_loader):
+        bx, by = bx.to(xla_device), by.to(xla_device)
         curr_batch_size = bx.size(0)
 
         # forward
@@ -147,7 +150,7 @@ def train():
         optimizer.zero_grad()
         loss = F.cross_entropy(logits, by)
         loss.backward()
-        optimizer.step()
+        xm.optimizer_step(optimizer, barrier=True)
         scheduler.step()
 
         # exponential moving average
@@ -162,6 +165,7 @@ def test():
     correct = 0
     with torch.no_grad():
         for data, target in test_loader:
+            data, target = data.to(xla_device), target.to(xla_device)
 
             # forward
             output = net(data * 2 - 1)
