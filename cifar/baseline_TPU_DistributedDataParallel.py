@@ -97,11 +97,9 @@ with open(os.path.join(args.save, args.dataset + args.model +
 
 def train(train_loader, net, optimizer, scheduler, xla_device, args):
 
-    device = xm.xla_device()
     parallel_loader = pl.ParallelLoader(train_loader, [xla_device]).per_device_loader(xla_device)
 
-
-    net = net.train().to(device) # enter train mode
+    net = net.train().to(xla_device) # enter train mode
 
     loss_avg = 0.0
     for i, (bx, by) in enumerate(parallel_loader):
@@ -124,6 +122,34 @@ def train(train_loader, net, optimizer, scheduler, xla_device, args):
 
     # state['train_loss'] = loss_avg
     return loss_avg
+
+def test(test_loader, net, xla_device, args):
+    loss_total = 0.0
+    correct = 0
+    guesses = 0
+
+    parallel_loader = pl.ParallelLoader(test_loader, [xla_device]).per_device_loader(xla_device)
+    net = net.eval().to(xla_device)
+
+    with torch.no_grad():
+        for data, target in test_loader:
+            batch_size = data.shape[0]
+            data, target = data.to(xla_device), target.to(xla_device)
+
+            # forward
+            output = net(data * 2 - 1)
+            loss = F.cross_entropy(output, target, reduction='sum')
+
+            # accuracy
+            pred = output.data.max(1)[1]
+            correct += pred.eq(target.data).sum().item()
+
+            # test loss average
+            loss_total += float(loss.data)
+
+            guesses += batch_size
+
+    return loss_total, correct, guesses
 
 
 def main(index, args):
@@ -209,51 +235,76 @@ def main(index, args):
 
         # Spawn a bunch of processes, one for each TPU core.
         train_loss = train(train_loader, net, optimizer, scheduler, xla_device, args)
+
+        # Calculate test loss
+        test_results = test(test_loader, net, xla_device, args)
+
         # TODO: Make this work.
-        ret = xm.rendezvous("calc_train_loss", payload=str(train_loss))
-        print(ret)
-        state['train_loss'] = train_loss
+        all_train_losses = xm.rendezvous("calc_train_loss", payload=str(train_loss))
+        all_test_results = xm.rendezvous("calc_test_results", payload=str(test_results))
+        all_test_results = parse_test_results(all_test_results)
 
-        # test()
+        if xm.is_master_ordinal():
+            child_train_losses = [float(L) for L in all_train_losses]
+            train_loss = sum(child_train_losses) / float(len(train_losses))
+            state['train_loss'] = train_loss
 
-        # Save model
-        xm.save(
-            net.state_dict(),
-            os.path.join(
-                args.save, 
-                args.dataset + args.model + '_baseline_epoch_' + str(epoch) + '.pt'
+            test_loss = sum([r[0] for r in all_test_results]) / sum([r[2] for r in all_test_results])
+            test_acc = sum([r[1] for r in all_test_results]) / sum([r[2] for r in all_test_results])
+            state['test_loss'] = test_loss
+            state['test_accuracy'] = test_acc
+
+            # Save model
+            xm.save(
+                net.state_dict(),
+                os.path.join(
+                    args.save, 
+                    args.dataset + args.model + '_baseline_epoch_' + str(epoch) + '.pt'
+                )
             )
-        )
 
-        # Let us not waste space and delete the previous model
-        prev_path = os.path.join(
-            args.save, args.dataset + args.model +
-            '_baseline_epoch_' + str(epoch - 1) + '.pt'
-        )
-        if os.path.exists(prev_path): os.remove(prev_path)
+            # Let us not waste space and delete the previous model
+            prev_path = os.path.join(
+                args.save, args.dataset + args.model +
+                '_baseline_epoch_' + str(epoch - 1) + '.pt'
+            )
+            if os.path.exists(prev_path): os.remove(prev_path)
 
-        # Show results
-        with open(os.path.join(args.save, args.dataset + args.model +
-                                        '_baseline_training_results.csv'), 'a') as f:
-            f.write('%03d,%05d,%0.6f,%0.5f,%0.2f\n' % (
+            # Show results
+            with open(os.path.join(args.save, args.dataset + args.model +
+                                            '_baseline_training_results.csv'), 'a') as f:
+                f.write('%03d,%05d,%0.6f,%0.5f,%0.2f\n' % (
+                    (epoch + 1),
+                    time.time() - begin_epoch,
+                    state['train_loss'],
+                    state['test_loss'],
+                    100 - 100. * state['test_accuracy'],
+                ))
+
+            xm.print('Epoch {0:3d} | Time {1:5d} | Train Loss {2:.4f} | Test Loss {3:.3f} | Test Error {4:.2f}'.format(
                 (epoch + 1),
-                time.time() - begin_epoch,
+                int(time.time() - begin_epoch),
                 state['train_loss'],
                 state['test_loss'],
-                100 - 100. * state['test_accuracy'],
-            ))
+                100 - 100. * state['test_accuracy'])
+            )
 
-        xm.print('Epoch {0:3d} | Time {1:5d} | Train Loss {2:.4f} | Test Loss {3:.3f} | Test Error {4:.2f}'.format(
-            (epoch + 1),
-            int(time.time() - begin_epoch),
-            state['train_loss'],
-            state['test_loss'],
-            100 - 100. * state['test_accuracy'])
-        )
+            writer.add_scalar("test_loss", state["test_loss"], epoch + 1)
+            writer.add_scalar("test_accuracy", state["test_accuracy"], epoch + 1)
+        
+        # Wait for master to finish Disk I/O above
+        xm.rendezvous("epoch_finish")
 
-        writer.add_scalar("test_loss", state["test_loss"], epoch + 1)
-        writer.add_scalar("test_accuracy", state["test_accuracy"], epoch + 1)
 
+def parse_test_results(results):
+    parsed = []
+    for result in results:
+        result = result.split(",")
+        result[0] = result[0][1:]
+        result[-1] = result[-1][:-1]
+        parsed.append([float(r) for r in results])
+    
+    return parsed
 
 if __name__ == "__main__":
     xmp.spawn(main, args=(args,), nprocs=args.nprocs)
