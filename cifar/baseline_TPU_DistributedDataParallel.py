@@ -94,7 +94,7 @@ with open(os.path.join(args.save, args.dataset + args.model +
 # /////////////// Training ///////////////
 
 
-def train(train_loader, xla_device, args):
+def train(train_loader, net, xla_device, args):
 
     device = xm.xla_device()
     parallel_loader = pl.ParallelLoader(train_loader, [xla_device]).per_device_loader(xla_device)
@@ -207,7 +207,7 @@ def main():
         begin_epoch = time.time()
 
         # Spawn a bunch of processes, one for each TPU core.
-        train(train_loader, xla_device, args)
+        train(train_loader, net, xla_device, args)
         print(res)
 
         # test()
