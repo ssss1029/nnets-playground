@@ -208,13 +208,15 @@ def main(index, args):
         begin_epoch = time.time()
 
         # Spawn a bunch of processes, one for each TPU core.
-        res = train(train_loader, net, optimizer, scheduler, xla_device, args)
-        print(res)
+        train_loss = train(train_loader, net, optimizer, scheduler, xla_device, args)
+        xm.rendezvous("calc_trainb_loss")
+        train_loss = xm.mesh_reduce("calc_train_loss", train_loss, lambda _lst: sum(_lst) / len(_lst))
+        state['train_loss'] = train_loss
 
         # test()
 
         # Save model
-        torch.save(
+        xm.save(
             net.state_dict(),
             os.path.join(
                 args.save, 
@@ -240,7 +242,7 @@ def main(index, args):
                 100 - 100. * state['test_accuracy'],
             ))
 
-        print('Epoch {0:3d} | Time {1:5d} | Train Loss {2:.4f} | Test Loss {3:.3f} | Test Error {4:.2f}'.format(
+        xm.print('Epoch {0:3d} | Time {1:5d} | Train Loss {2:.4f} | Test Loss {3:.3f} | Test Error {4:.2f}'.format(
             (epoch + 1),
             int(time.time() - begin_epoch),
             state['train_loss'],
