@@ -152,8 +152,6 @@ def train():
         loss = F.cross_entropy(logits, by)
         loss.backward()
         xm.optimizer_step(optimizer, barrier=True)
-        print(torch_xla._XLAC._xla_tensors_report(0, str(xla_device)))
-        import pdb; pdb.set_trace()
 
         scheduler.step()
 
