@@ -225,7 +225,7 @@ def main(index, args):
             1,  # since lr_lambda computes multiplicative factor
             1e-6 / args.learning_rate))
 
-    print('Beginning Training\n')
+    print('Beginning Training')
 
     # Main loop
     for epoch in range(start_epoch, args.epochs):
@@ -299,7 +299,7 @@ def main(index, args):
 def parse_test_results(results):
     parsed = []
     for result in results:
-        result = result.split(",")
+        result = result.split(',')
         result[0] = result[0][1:]
         result[-1] = result[-1][:-1]
         parsed.append([float(r) for r in results])
