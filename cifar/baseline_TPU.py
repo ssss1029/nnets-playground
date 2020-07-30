@@ -141,6 +141,7 @@ def train():
     net.train()  # enter train mode
     loss_avg = 0.0
     for bx, by in tqdm(train_loader):
+        # print(xmetrics.metrics_report())
         bx, by = bx.to(xla_device), by.to(xla_device)
         curr_batch_size = bx.size(0)
 
