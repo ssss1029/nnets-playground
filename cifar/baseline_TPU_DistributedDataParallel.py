@@ -210,7 +210,7 @@ def main(index, args):
         # Spawn a bunch of processes, one for each TPU core.
         train_loss = train(train_loader, net, optimizer, scheduler, xla_device, args)
         # TODO: Make this work.
-        ret = xm.rendezvous("calc_train_loss", payload=train_loss)
+        ret = xm.rendezvous("calc_train_loss", payload=str(train_loss))
         print(ret)
         state['train_loss'] = train_loss
 
