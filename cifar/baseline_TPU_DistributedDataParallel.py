@@ -239,7 +239,16 @@ def main(index, args):
         # Calculate test loss
         test_results = test(test_loader, net, xla_device, args)
 
-        # TODO: Make this work.
+        # Save model. Does sync between all processes
+        xm.save(
+            net.state_dict(),
+            os.path.join(
+                args.save, 
+                args.dataset + args.model + '_baseline_epoch_' + str(epoch) + '.pt'
+            )
+        )
+
+        # Record stuff
         all_train_losses = xm.rendezvous("calc_train_loss", payload=str(train_loss))
         all_test_results = xm.rendezvous("calc_test_results", payload=str(test_results))
         all_test_results = parse_test_results(all_test_results)
@@ -254,15 +263,6 @@ def main(index, args):
             test_acc = sum([r[1] for r in all_test_results]) / sum([r[2] for r in all_test_results])
             state['test_loss'] = test_loss
             state['test_accuracy'] = test_acc
-
-            # Save model
-            xm.save(
-                net.state_dict(),
-                os.path.join(
-                    args.save, 
-                    args.dataset + args.model + '_baseline_epoch_' + str(epoch) + '.pt'
-                )
-            )
 
             # Let us not waste space and delete the previous model
             prev_path = os.path.join(
@@ -282,7 +282,7 @@ def main(index, args):
                     100 - 100. * state['test_accuracy'],
                 ))
 
-            xm.print('Epoch {0:3d} | Time {1:5d} | Train Loss {2:.4f} | Test Loss {3:.3f} | Test Error {4:.2f}'.format(
+            print('Epoch {0:3d} | Time {1:5d} | Train Loss {2:.4f} | Test Loss {3:.3f} | Test Error {4:.2f}'.format(
                 (epoch + 1),
                 int(time.time() - begin_epoch),
                 state['train_loss'],
