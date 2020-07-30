@@ -252,4 +252,4 @@ def main(index, args):
 
 
 if __name__ == "__main__":
-    xmp.spawn(main, args=(args,), nprocs=8)
+    xmp.spawn(main, args=(args,), nprocs=1)
