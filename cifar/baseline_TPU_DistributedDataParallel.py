@@ -209,8 +209,9 @@ def main(index, args):
 
         # Spawn a bunch of processes, one for each TPU core.
         train_loss = train(train_loader, net, optimizer, scheduler, xla_device, args)
-        xm.rendezvous("calc_train_loss")
-        train_loss = xm.mesh_reduce("calc_train_loss", train_loss, lambda _lst: sum(_lst) / len(_lst))
+        # TODO: Make this work.
+        # xm.rendezvous("calc_train_loss")
+        # train_loss = xm.mesh_reduce("calc_train_loss", train_loss, lambda _lst: sum(_lst) / len(_lst))
         state['train_loss'] = train_loss
 
         # test()
