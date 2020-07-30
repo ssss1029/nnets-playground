@@ -304,7 +304,7 @@ def parse_test_results(results):
         result = result.split(',')
         result[0] = result[0][1:]
         result[-1] = result[-1][:-1]
-        parsed.append([float(r) for r in results])
+        parsed.append([float(r) for r in result])
     
     return parsed
 
