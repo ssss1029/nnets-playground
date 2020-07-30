@@ -242,8 +242,8 @@ def main(index, args):
         # TODO: Make this work.
         all_train_losses = xm.rendezvous("calc_train_loss", payload=str(train_loss))
         all_test_results = xm.rendezvous("calc_test_results", payload=str(test_results))
-        print(all_test_results)
         all_test_results = parse_test_results(all_test_results)
+        print(all_test_results)
 
         if xm.is_master_ordinal():
             all_train_losses = [float(L) for L in all_train_losses]
@@ -294,6 +294,7 @@ def main(index, args):
             writer.add_scalar("test_accuracy", state["test_accuracy"], epoch + 1)
         
         # Wait for master to finish Disk I/O above
+        print("Finished with one epoch")
         xm.rendezvous("epoch_finish")
 
 
