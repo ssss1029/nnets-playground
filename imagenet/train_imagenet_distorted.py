@@ -322,7 +322,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         bx = images
         by = target
 
-        # print("Zero grad")
+        print("Zero grad")
         optimizer.zero_grad()
 
         # with torch.no_grad():
@@ -334,10 +334,10 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         #         bx = noise2net(bx)
         #         bx = bx.reshape((batch_size, 3, 224, 224))
 
-        # print("Forward")
+        print("Forward")
         logits = model(bx)
 
-        # print("Cross Entropy")
+        print("Cross Entropy")
         loss = F.cross_entropy(logits, by)
 
         # measure accuracy and record loss
@@ -347,13 +347,13 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
 
-        # print("Backward")
+        print("Backward")
         loss.backward()
 
-        # print("Step")
+        print("Step")
         xm.optimizer_step(optimizer)
         
-        # print("Scheduler step")
+        print("Scheduler step")
         scheduler.step()
 
         # measure elapsed time
