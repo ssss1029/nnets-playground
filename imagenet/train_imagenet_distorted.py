@@ -248,7 +248,8 @@ def main_worker(index, ngpus_per_node, args):
             args.epochs * len(train_loader),
             1,  # since lr_lambda computes multiplicative factor
             1e-6 / (args.lr * args.batch_size / 256.)))
-    scheduler.step(args.start_epoch * len(train_loader))
+    if args.start_epoch != 0:
+        scheduler.step(args.start_epoch * len(train_loader))
 
     if args.evaluate:
         validate(val_loader, model, args)
