@@ -41,7 +41,7 @@ parser = argparse.ArgumentParser(description='DeepAugment ImageNet Training')
 parser.add_argument('data', metavar='DIR',
                     help='path to dataset')
 parser.add_argument('--save', type=str, required=True)
-parser.add_argument('--extra-dataset', action='append', choices=['edsr', 'cae', 'noise2net'], required=False)
+parser.add_argument('--extra-dataset', action='append', choices=['edsr', 'cae', 'noise2net'], default=[], required=False)
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet50',
                     choices=model_names,
                     help='model architecture: ' +
