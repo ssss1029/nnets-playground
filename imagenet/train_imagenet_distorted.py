@@ -148,7 +148,7 @@ def main_worker(gpu, ngpus_per_node, args):
         raise NotImplementedError()
     elif args.device == 'tpu':
         # Acquires the (unique) Cloud TPU core corresponding to this process's index
-        xla_device = xm.xla_device()
+        DEVICE = xm.xla_device()
 
     # create model
     if args.pretrained:
@@ -190,11 +190,8 @@ def main_worker(gpu, ngpus_per_node, args):
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss()
 
-    if args.device == 'tpu':
-        criterion = criterion.to(xla_device)
-        model = model.to(xla_device)
-    elif args.device == 'gpu':
-        raise NotImplementedError()
+    criterion = criterion.to(DEVICE)
+    model = model.to(DEVICE)
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -332,10 +329,10 @@ def main_worker(gpu, ngpus_per_node, args):
             train_sampler.set_epoch(epoch)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, scheduler, epoch, args)
+        train(train_loader, model, criterion, optimizer, scheduler, epoch, args, DEVICE)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args)
+        acc1 = validate(val_loader, model, criterion, args, DEVICE)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -352,7 +349,7 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_best)
 
 
-def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
+def train(train_loader, model, criterion, optimizer, scheduler, epoch, args, DEVICE):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -372,8 +369,8 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
         data_time.update(time.time() - end)
 
 
-        bx = images.cuda(args.gpu, non_blocking=True)
-        by = target.cuda(args.gpu, non_blocking=True)
+        bx = images.to(DEVICE)
+        by = target.to(DEVICE)
 
         logits = model(bx)
 
@@ -401,7 +398,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
             progress.display(i)
 
 
-def validate(val_loader, model, criterion, args):
+def validate(val_loader, model, criterion, args, DEVICE):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -417,9 +414,9 @@ def validate(val_loader, model, criterion, args):
     with torch.no_grad():
         end = time.time()
         for i, (images, target) in enumerate(val_loader):
-            if args.gpu is not None:
-                images = images.cuda(args.gpu, non_blocking=True)
-            target = target.cuda(args.gpu, non_blocking=True)
+
+            images = images.to(DEVICE)
+            target = target.to(DEVICE)
 
             # compute output
             output = model(images)
