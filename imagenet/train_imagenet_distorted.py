@@ -375,9 +375,8 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         print("Cross Entropy")
         loss = F.cross_entropy(logits, by)
 
-        output, target = logits, by
-
         # # measure accuracy and record loss
+        # output, target = logits, by
         # acc1, acc5 = accuracy(output, target, topk=(1, 5))
         # losses.update(loss.item(), images.size(0))
         # top1.update(acc1[0], images.size(0))
