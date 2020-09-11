@@ -363,6 +363,11 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args, DEV
     # switch to train mode
     model.train()
 
+    if args.device == 'tpu':
+        loader = pl.ParallelLoader(train_loader, [DEVICE]).per_device_loader(DEVICE)
+    else:
+        loader = train_loader
+
     end = time.time()
     for i, (images, target) in enumerate(train_loader):
         # measure data loading time
@@ -385,7 +390,11 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args, DEV
         top5.update(acc5[0], images.size(0))
 
         # compute gradient and do SGD step
-        optimizer.zero_grad()
+        if args.device == 'tpu':
+            xm.optimizer_step(optimizer)
+        else:
+            optimizer.zero_grad()
+
         loss.backward()
         optimizer.step()
         scheduler.step()
