@@ -271,6 +271,8 @@ def main_worker(index, ngpus_per_node, args):
             to_print['FILENAME'] = __file__
             pprint.pprint(to_print, stream=f)
 
+    print("BEGINNING TRAINING")
+
     for epoch in range(args.start_epoch, args.epochs):
         train_sampler.set_epoch(epoch)
 
