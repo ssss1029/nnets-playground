@@ -123,23 +123,7 @@ def main():
         else:
             print("Made save directory", args.save)
 
-    if args.seed is not None:
-        random.seed(args.seed)
-        torch.manual_seed(args.seed)
-        cudnn.deterministic = True
-        warnings.warn('You have chosen to seed training. '
-                      'This will turn on the CUDNN deterministic setting, '
-                      'which can slow down your training considerably! '
-                      'You may see unexpected behavior when restarting '
-                      'from checkpoints.')
-
-    if args.device == 'cpu':
-        # Simply call main_worker function
-        main_worker(args.gpu, args.nprocs, args)
-    elif args.device == 'gpu':
-        mp.spawn(main_worker, nprocs=args.nprocs, args=(args.nprocs, args))
-    elif args.device == 'tpu':
-        xmp.spawn(main_worker, nprocs=args.nprocs, args=(args.nprocs, args))
+    xmp.spawn(main_worker, nprocs=args.nprocs, args=(args.nprocs, args))
 
 def main_worker(index, ngpus_per_node, args):
     global best_acc1
@@ -273,7 +257,7 @@ def main_worker(index, ngpus_per_node, args):
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+        num_workers=args.workers, pin_memory=False, sampler=train_sampler)
 
     val_loader = torch.utils.data.DataLoader(
         datasets.ImageFolder(valdir, transforms.Compose([
@@ -283,7 +267,7 @@ def main_worker(index, ngpus_per_node, args):
             normalize,
         ])),
         batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+        num_workers=args.workers, pin_memory=False)
 
     def cosine_annealing(step, total_steps, lr_max, lr_min):
         return lr_min + (lr_max - lr_min) * 0.5 * (
