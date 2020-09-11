@@ -317,29 +317,29 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         bx = images
         by = target
 
-        print("Zero grad")
+        # print("Zero grad")
         optimizer.zero_grad()
 
-        print("Forward")
+        # print("Forward")
         logits = model(bx)
 
-        print("Cross Entropy")
+        # print("Cross Entropy")
         loss = F.cross_entropy(logits, by)
 
-        # # measure accuracy and record loss
-        # output, target = logits, by
-        # acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        # losses.update(loss.item(), images.size(0))
-        # top1.update(acc1[0], images.size(0))
-        # top5.update(acc5[0], images.size(0))
+        # measure accuracy and record loss
+        output, target = logits, by
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        losses.update(loss.item(), images.size(0))
+        top1.update(acc1[0], images.size(0))
+        top5.update(acc5[0], images.size(0))
 
-        print("Backward")
+        # print("Backward")
         loss.backward()
 
-        print("Step")
+        # print("Step")
         xm.optimizer_step(optimizer)
         
-        print("Scheduler step")
+        # print("Scheduler step")
         scheduler.step()
 
         # measure elapsed time
