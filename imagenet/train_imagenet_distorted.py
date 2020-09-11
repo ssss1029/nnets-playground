@@ -308,6 +308,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
     model = model.train().to(DEVICE)
 
     loader = pl.ParallelLoader(train_loader, [DEVICE]).per_device_loader(DEVICE)
+    noise2net = Res2Net(epsilon=0.50, hidden_planes=16, batch_size=args.batch_size).train().to(DEVICE)
 
     end = time.time()
     for i, (images, target) in enumerate(loader):
@@ -319,6 +320,13 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
 
         # print("Zero grad")
         optimizer.zero_grad()
+
+        with torch.no_grad():
+            noise2net.reload_parameters()
+            noise2net.set_epsilon(random.uniform(0, args.noisenet_max_eps))
+            bx = bx.reshape((1, batch_size * 3, 224, 224))
+            bx = noise2net(bx)
+            bx = bx.reshape((batch_size, 3, 224, 224))
 
         # print("Forward")
         logits = model(bx)
