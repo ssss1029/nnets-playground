@@ -225,7 +225,7 @@ def main_worker(index, ngpus_per_node, args):
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=False, sampler=train_sampler)
+        num_workers=args.workers, pin_memory=False, sampler=train_sampler, drop_last=True)
 
     val_loader = torch.utils.data.DataLoader(
         datasets.ImageFolder(valdir, transforms.Compose([
@@ -324,8 +324,9 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         optimizer.zero_grad()
 
         with torch.no_grad():
+            batch_size = bx.shape[0]
             noise2net.reload_parameters()
-            noise2net.set_epsilon(random.uniform(0, args.noisenet_max_eps))
+            noise2net.set_epsilon(random.uniform(args.noisenet_max_eps / 2.0, args.noisenet_max_eps))
             bx = bx.reshape((1, batch_size * 3, 224, 224))
             bx = noise2net(bx)
             bx = bx.reshape((batch_size, 3, 224, 224))
