@@ -187,7 +187,6 @@ def main_worker(index, ngpus_per_node, args):
     #     else:
     #         model = torch.nn.DataParallel(model).cuda()
 
-    model = model.to(DEVICE)
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay, nesterov=True)
@@ -354,7 +353,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         prefix="Epoch: [{}]".format(epoch))
 
     # switch to train mode
-    model.train()
+    model = model.train().to(DEVICE)
 
     if args.device == 'tpu':
         loader = pl.ParallelLoader(train_loader, [DEVICE]).per_device_loader(DEVICE)
@@ -384,12 +383,17 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
 
+        print("Backward")
         loss.backward()
+
+        print("Step")
         # compute gradient and do SGD step
         if args.device == 'tpu':
             xm.optimizer_step(optimizer)
         else:
             optimizer.zero_grad()
+        
+        print("Scheduler step")
         scheduler.step()
 
         # measure elapsed time
@@ -411,7 +415,7 @@ def validate(val_loader, model, args, DEVICE):
         prefix='Test: ')
 
     # switch to evaluate mode
-    model.eval()
+    model = model.eval().to(DEVICE)
 
     with torch.no_grad():
         end = time.time()
