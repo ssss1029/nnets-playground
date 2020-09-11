@@ -141,7 +141,7 @@ def main():
     elif args.device == 'tpu':
         xmp.spawn(main_worker, nprocs=args.nprocs, args=(args.nprocs, args))
 
-def main_worker(gpu, ngpus_per_node, args):
+def main_worker(index, ngpus_per_node, args):
     global best_acc1
 
     if args.device == 'gpu':
@@ -216,8 +216,6 @@ def main_worker(gpu, ngpus_per_node, args):
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
 
-    cudnn.benchmark = True
-
     # Data loading code
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, 'val')
@@ -266,7 +264,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train_sampler = torch.utils.data.distributed.DistributedSampler(
             train_dataset,
             num_replicas=ngpus_per_node,
-            rank=gpu,
+            rank=index,
             shuffle=True
         )
     else:
