@@ -149,6 +149,8 @@ def main_worker(index, ngpus_per_node, args):
     elif args.device == 'tpu':
         # Acquires the (unique) Cloud TPU core corresponding to this process's index
         DEVICE = xm.xla_device()
+    
+    print("DEVICE = ", DEVICE)
 
     # create model
     if args.pretrained:
