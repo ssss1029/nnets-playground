@@ -372,8 +372,10 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         bx = images.to(DEVICE)
         by = target.to(DEVICE)
 
+        print("Forward")
         logits = model(bx)
 
+        print("Cross Entropy")
         loss = F.cross_entropy(logits, by)
 
         output, target = logits, by
@@ -384,14 +386,12 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
 
+        loss.backward()
         # compute gradient and do SGD step
         if args.device == 'tpu':
             xm.optimizer_step(optimizer)
         else:
             optimizer.zero_grad()
-
-        loss.backward()
-        optimizer.step()
         scheduler.step()
 
         # measure elapsed time
