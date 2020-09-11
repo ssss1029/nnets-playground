@@ -138,8 +138,8 @@ def main_worker(index, ngpus_per_node, args):
         print("=> using pre-trained model '{}'".format(args.arch))
         model = models.__dict__[args.arch](pretrained=True)
     else:
-        print("=> creating pre-trained model (pretrained is forced) '{}'".format(args.arch))
-        model = models.__dict__[args.arch](pretrained=True)
+        print("=> creating NON pre-trained model '{}'".format(args.arch))
+        model = models.__dict__[args.arch](pretrained=False)
     
     model = model.to(DEVICE)
 
