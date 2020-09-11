@@ -104,7 +104,6 @@ best_acc1 = 0
 
 
 def main():
-
     if os.path.exists(args.save):
         resp = "None"
         while resp.lower() not in {'y', 'n'}:
@@ -124,7 +123,6 @@ def main():
         else:
             print("Made save directory", args.save)
 
-
     if args.seed is not None:
         random.seed(args.seed)
         torch.manual_seed(args.seed)
@@ -134,6 +132,8 @@ def main():
                       'which can slow down your training considerably! '
                       'You may see unexpected behavior when restarting '
                       'from checkpoints.')
+
+    print("HERE")
 
     if args.device == 'cpu':
         # Simply call main_worker function
