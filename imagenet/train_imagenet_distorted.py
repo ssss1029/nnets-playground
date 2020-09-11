@@ -317,7 +317,7 @@ def main_worker(index, ngpus_per_node, args):
             pprint.pprint(to_print, stream=f)
 
     for epoch in range(args.start_epoch, args.epochs):
-        if args.device == 'tpu' or args.device == 'tpu':
+        if args.device == 'tpu' or args.device == 'gpu':
             train_sampler.set_epoch(epoch)
 
         # train for one epoch
@@ -382,6 +382,9 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         # top1.update(acc1[0], images.size(0))
         # top5.update(acc5[0], images.size(0))
 
+        print("Zero grad")
+        optimizer.zero_grad()
+
         print("Backward")
         loss.backward()
 
@@ -390,7 +393,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
         if args.device == 'tpu':
             xm.optimizer_step(optimizer)
         else:
-            optimizer.zero_grad()
+            optimizer.step()
         
         print("Scheduler step")
         scheduler.step()
