@@ -133,8 +133,6 @@ def main():
                       'You may see unexpected behavior when restarting '
                       'from checkpoints.')
 
-    print("HERE")
-
     if args.device == 'cpu':
         # Simply call main_worker function
         main_worker(args.gpu, args.nprocs, args)
@@ -330,7 +328,7 @@ def main_worker(gpu, ngpus_per_node, args):
             pprint.pprint(to_print, stream=f)
 
     for epoch in range(args.start_epoch, args.epochs):
-        if args.distributed:
+        if args.device == 'tpu' or args.device == 'tpu':
             train_sampler.set_epoch(epoch)
 
         # train for one epoch
