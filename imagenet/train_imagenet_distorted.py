@@ -187,12 +187,7 @@ def main_worker(gpu, ngpus_per_node, args):
     #     else:
     #         model = torch.nn.DataParallel(model).cuda()
 
-    # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss()
-
-    criterion = criterion.to(DEVICE)
     model = model.to(DEVICE)
-
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay, nesterov=True)
@@ -305,7 +300,7 @@ def main_worker(gpu, ngpus_per_node, args):
     scheduler.step(args.start_epoch * len(train_loader))
 
     if args.evaluate:
-        validate(val_loader, model, criterion, args)
+        validate(val_loader, model, args)
         return
     
     if not args.resume:
@@ -329,10 +324,10 @@ def main_worker(gpu, ngpus_per_node, args):
             train_sampler.set_epoch(epoch)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, scheduler, epoch, args, DEVICE)
+        train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args, DEVICE)
+        acc1 = validate(val_loader, model, args, DEVICE)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -349,7 +344,7 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_best)
 
 
-def train(train_loader, model, criterion, optimizer, scheduler, epoch, args, DEVICE):
+def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -379,7 +374,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args, DEV
 
         logits = model(bx)
 
-        loss = criterion(logits, by)
+        loss = F.cross_entropy(logits, by)
 
         output, target = logits, by
 
@@ -407,7 +402,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args, DEV
             progress.display(i)
 
 
-def validate(val_loader, model, criterion, args, DEVICE):
+def validate(val_loader, model, args, DEVICE):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -429,7 +424,7 @@ def validate(val_loader, model, criterion, args, DEVICE):
 
             # compute output
             output = model(images)
-            loss = criterion(output, target)
+            loss = F.cross_entropy(output, target)
 
             # measure accuracy and record loss
             acc1, acc5 = accuracy(output, target, topk=(1, 5))
