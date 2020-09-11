@@ -128,11 +128,8 @@ def main():
 def main_worker(index, ngpus_per_node, args):
     global best_acc1
 
-    if args.device == 'gpu':
-        raise NotImplementedError()
-    elif args.device == 'tpu':
-        # Acquires the (unique) Cloud TPU core corresponding to this process's index
-        DEVICE = xm.xla_device()
+    # Acquires the (unique) Cloud TPU core corresponding to this process's index
+    DEVICE = xm.xla_device()
     
     print("DEVICE = ", DEVICE)
 
@@ -218,15 +215,12 @@ def main_worker(index, ngpus_per_node, args):
 
     train_dataset = torch.utils.data.ConcatDataset(train_datasets)
 
-    if args.device == 'tpu' or arge.device == 'gpu':
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_dataset,
-            num_replicas=ngpus_per_node,
-            rank=index,
-            shuffle=True
-        )
-    else:
-        train_sampler = None
+    train_sampler = torch.utils.data.distributed.DistributedSampler(
+        train_dataset,
+        num_replicas=ngpus_per_node,
+        rank=index,
+        shuffle=True
+    )
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
@@ -276,8 +270,7 @@ def main_worker(index, ngpus_per_node, args):
             pprint.pprint(to_print, stream=f)
 
     for epoch in range(args.start_epoch, args.epochs):
-        if args.device == 'tpu' or args.device == 'gpu':
-            train_sampler.set_epoch(epoch)
+        train_sampler.set_epoch(epoch)
 
         # train for one epoch
         train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE)
@@ -314,10 +307,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
     # switch to train mode
     model = model.train().to(DEVICE)
 
-    if args.device == 'tpu':
-        loader = pl.ParallelLoader(train_loader, [DEVICE]).per_device_loader(DEVICE)
-    else:
-        loader = train_loader
+    loader = pl.ParallelLoader(train_loader, [DEVICE]).per_device_loader(DEVICE)
 
     end = time.time()
     for i, (images, target) in enumerate(loader):
