@@ -344,9 +344,7 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_best)
 
 
-def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):
-    torch.autograd.set_detect_anomaly(True)
-    
+def train(train_loader, model, optimizer, scheduler, epoch, args, DEVICE):    
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
